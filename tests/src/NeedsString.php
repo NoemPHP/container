@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Noem\Container\Tests;
+
+class NeedsString
+{
+
+    public function __construct(public string $value)
+    {
+    }
+}
