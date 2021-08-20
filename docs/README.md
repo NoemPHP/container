@@ -11,7 +11,7 @@
 Can be used on parameters of factories/extension functions. It instructs the Container to resolve the parameter by
 fetching the specified entry. Takes precedence over other means of parameter resolution
 
-[embed]:# "path: ../tests/Integration/ContainerAutoWiringTest.php, match: 'public function testCanProcessIdAttribute.*?}'"
+[embed]:# (path: ../tests/Integration/ContainerAutoWiringTest.php, match: 'public function testCanProcessIdAttribute.*?}')
 ```php
 public function testCanProcessIdAttribute()
     {
