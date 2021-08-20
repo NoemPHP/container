@@ -1,26 +1,29 @@
 title: Noem Container
 description: >-
-    A modern DI Container using ServiceProviders, Auto-wiring and Attribute-based metadata
+  A modern DI Container using ServiceProviders, Auto-wiring and Attribute-based metadata
 baseurl: /container # Your repo name with a leading slash.
 show_downloads: false
 # Aux links for the upper right navigation
 aux_links:
-    "Noem State Machine on GitHub":
-        - https://github.com/NoemPHP/container
+  "Noem State Machine on GitHub":
+    - https://github.com/NoemPHP/container
 
 # Footer "Edit this page on GitHub" link text
 gh_edit_repository: https://github.com/NoemPHP/container # Your repo GitHub URL
 gh_edit_branch: master # The default branch of the repo. Default: main
 gh_edit_source: docs # The directory containing the docs. Default: docs
 
+kramdown:
+  smart_quotes: [ "apos", "apos", "quot", "quot" ]
+
 remote_theme: pmarsceill/just-the-docs
 
 
 plugins:
-    - jekyll-remote-theme
-    - jekyll-seo-tag
-    - jekyll-sitemap
-    - jemoji
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jemoji
 
 permalink: pretty
 theme: just-the-docs
