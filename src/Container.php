@@ -37,21 +37,37 @@ class Container implements TaggableContainer
 
     private Invoker $invoker;
 
-    private ResolverChain $resolvers;
+    private ResolverChain $resolver;
 
     public function __construct(Provider ...$providers)
     {
-        $factories = [];
+
+
+        $this->resolver = new ResolverChain([
+//            new TypeHintResolver(),
+//            new NoDependantsResolver(),
+            new IdAttributeResolver($this),
+            new TaggedAttributeResolver($this),
+            new TypeHintContainerResolver($this),
+            new DefaultValueResolver(),
+        ]);
+        $this->invoker = new Invoker($this->resolver, $this);
+
+        $factories = [
+            self::class =>
+                #[Description('The Noem Application Container')]
+                fn() => $this,
+            Invoker::class =>
+                #[Description('The Noem autowiring helper')]
+                fn() => $this->invoker
+        ];
         $extensions = [];
+
         foreach ($providers as $provider) {
             $factories = array_merge(
                 $factories,
                 $provider->getFactories(),
-                [
-                    self::class =>
-                        #[Description('The Noem Application Container')]
-                        fn() => $this,
-                ]
+
             );
             $extensions = $this->mergeExtensions($extensions, $provider->getExtensions());
         }
@@ -60,15 +76,6 @@ class Container implements TaggableContainer
         $this->extensions = $extensions;
         $this->meta = $this->processMetaData($factories);
 
-        $this->resolvers = new ResolverChain([
-                                                 new TypeHintResolver(),
-                                                 new NoDependantsResolver(),
-                                                 new IdAttributeResolver($this),
-                                                 new TaggedAttributeResolver($this),
-                                                 new TypeHintContainerResolver($this),
-                                                 new DefaultValueResolver(),
-                                             ]);
-        $this->invoker = new Invoker($this->resolvers, $this);
     }
 
     /**
@@ -197,7 +204,7 @@ class Container implements TaggableContainer
         } catch (\ReflectionException $e) {
             throw new InvocationException("Service id '{$type}' could not be autowired");
         }
-        $args = $this->resolvers->getParameters($reflection, [], []);
+        $args = $this->resolver->getParameters($reflection, [], []);
 
         // Sort by array key because call_user_func_array ignores numeric keys
         ksort($args);
