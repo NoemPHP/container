@@ -67,7 +67,6 @@ class Container implements TaggableContainer
             $factories = array_merge(
                 $factories,
                 $provider->getFactories(),
-
             );
             $extensions = $this->mergeExtensions($extensions, $provider->getExtensions());
         }
@@ -75,7 +74,6 @@ class Container implements TaggableContainer
         $this->factories = $factories;
         $this->extensions = $extensions;
         $this->meta = $this->processMetaData($factories);
-
     }
 
     /**
