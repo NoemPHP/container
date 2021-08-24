@@ -30,6 +30,6 @@ class ContainerReportTest extends TestCase
         $result = $sut->report();
         //print_r($result);
         // 4 larger than the actual no. of definitions since there is a header row, and the auto-appended container/invoker entries
-        $this->assertCount(6, $result);
+        $this->assertCount(7, $result);
     }
 }
