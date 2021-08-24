@@ -45,7 +45,7 @@ class Container implements TaggableContainer
     public function __construct(Provider ...$providers)
     {
         $this->resolver = new ResolverChain([
-                                                new NumericArrayResolver(),
+//                                                new NumericArrayResolver(),
                                                 new TypeHintResolver(),
                                                 new IdAttributeResolver($this),
                                                 new TaggedAttributeResolver($this),
@@ -145,7 +145,7 @@ class Container implements TaggableContainer
     /**
      * @throws NotFoundException|ServiceInvokationException
      */
-    public function get(string $id)
+    public function get($id)
     {
         if (array_key_exists($id, $this->cache)) {
             return $this->cache[$id];
