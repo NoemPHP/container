@@ -7,6 +7,7 @@ namespace Noem\Container;
 use Invoker\Exception\InvocationException;
 use Invoker\Exception\NotCallableException;
 use Invoker\Invoker;
+use Invoker\InvokerInterface;
 use Invoker\ParameterResolver\Container\TypeHintContainerResolver;
 use Invoker\ParameterResolver\DefaultValueResolver;
 use Invoker\ParameterResolver\ResolverChain;
@@ -19,6 +20,7 @@ use Noem\Container\Exception\ServiceInvokationException;
 use Noem\Container\ParameterResolver\IdAttributeResolver;
 use Noem\Container\ParameterResolver\NoDependantsResolver;
 use Noem\Container\ParameterResolver\TaggedAttributeResolver;
+use Psr\Container\ContainerInterface;
 use ReflectionParameter;
 
 class Container implements TaggableContainer
@@ -41,23 +43,24 @@ class Container implements TaggableContainer
 
     public function __construct(Provider ...$providers)
     {
-
-
         $this->resolver = new ResolverChain([
-//            new TypeHintResolver(),
-//            new NoDependantsResolver(),
-            new IdAttributeResolver($this),
-            new TaggedAttributeResolver($this),
-            new TypeHintContainerResolver($this),
-            new DefaultValueResolver(),
-        ]);
+                                                new TypeHintResolver(),
+                                                new NoDependantsResolver(),
+                                                new IdAttributeResolver($this),
+                                                new TaggedAttributeResolver($this),
+                                                new TypeHintContainerResolver($this),
+                                                new DefaultValueResolver(),
+                                            ]);
         $this->invoker = new Invoker($this->resolver, $this);
 
         $factories = [
+            ContainerInterface::class =>
+                #[Description('The Noem Application Container')]
+                fn() => $this,
             self::class =>
                 #[Description('The Noem Application Container')]
                 fn() => $this,
-            Invoker::class =>
+            InvokerInterface::class =>
                 #[Description('The Noem autowiring helper')]
                 fn() => $this->invoker
         ];

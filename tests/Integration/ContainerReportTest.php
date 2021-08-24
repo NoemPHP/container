@@ -29,7 +29,7 @@ class ContainerReportTest extends TestCase
         $sut = new Container(new ServiceProvider($services));
         $result = $sut->report();
         //print_r($result);
-        // 2 larger than the actual no. of definitions since there is a header row, and the auto-appended container entry
-        $this->assertCount(5, $result);
+        // 4 larger than the actual no. of definitions since there is a header row, and the auto-appended container/invoker entries
+        $this->assertCount(6, $result);
     }
 }
