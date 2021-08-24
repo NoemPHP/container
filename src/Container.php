@@ -10,6 +10,7 @@ use Invoker\Invoker;
 use Invoker\InvokerInterface;
 use Invoker\ParameterResolver\Container\TypeHintContainerResolver;
 use Invoker\ParameterResolver\DefaultValueResolver;
+use Invoker\ParameterResolver\NumericArrayResolver;
 use Invoker\ParameterResolver\ResolverChain;
 use Invoker\ParameterResolver\TypeHintResolver;
 use Invoker\Reflection\CallableReflection;
@@ -44,12 +45,13 @@ class Container implements TaggableContainer
     public function __construct(Provider ...$providers)
     {
         $this->resolver = new ResolverChain([
+                                                new NumericArrayResolver(),
                                                 new TypeHintResolver(),
-                                                new NoDependantsResolver(),
                                                 new IdAttributeResolver($this),
                                                 new TaggedAttributeResolver($this),
                                                 new TypeHintContainerResolver($this),
                                                 new DefaultValueResolver(),
+                                                new NoDependantsResolver(),
                                             ]);
         $this->invoker = new Invoker($this->resolver, $this);
 
@@ -183,7 +185,8 @@ class Container implements TaggableContainer
         return $this->invoker->call($this->extensions[$id], [$service]);
     }
 
-    public function has(string $id): bool
+    /** @noinspection PhpMissingReturnTypeInspection */
+    public function has(string $id)
     {
         return array_key_exists($id, $this->factories); //TODO Check if autowiring is possible?
     }
