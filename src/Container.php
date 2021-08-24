@@ -186,7 +186,7 @@ class Container implements TaggableContainer
     }
 
     /** @noinspection PhpMissingReturnTypeInspection */
-    public function has(string $id)
+    public function has($id)
     {
         return array_key_exists($id, $this->factories); //TODO Check if autowiring is possible?
     }
