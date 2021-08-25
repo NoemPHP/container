@@ -31,10 +31,7 @@ class Container implements TaggableContainer
 
     private array $extensions;
 
-    /**
-     * @var Meta[]
-     */
-    private array $meta;
+    private array $attributeMap;
 
     private array $cache = [];
 
@@ -45,7 +42,7 @@ class Container implements TaggableContainer
     public function __construct(Provider ...$providers)
     {
         $this->resolver = new ResolverChain([
-//                                                new NumericArrayResolver(),
+                                                new NumericArrayResolver(),
                                                 new TypeHintResolver(),
                                                 new IdAttributeResolver($this),
                                                 new TaggedAttributeResolver($this),
@@ -78,7 +75,7 @@ class Container implements TaggableContainer
 
         $this->factories = $factories;
         $this->extensions = $extensions;
-        $this->meta = $this->processMetaData($factories);
+        $this->attributeMap = $this->processAttributes($factories);
     }
 
     /**
@@ -102,7 +99,7 @@ class Container implements TaggableContainer
                 continue;
             }
             $default = $defaults[$key];
-            $merged[$key] = function (self $ctr, $previous = null) use ($default, $extension) {
+            $merged[$key] = function ($previous) use ($default, $extension) {
                 assert(is_callable($default));
 
                 $result = $this->invoker->call($default, [$previous]);
@@ -116,27 +113,15 @@ class Container implements TaggableContainer
         return array_merge($defaults, $merged);
     }
 
-    private function processMetaData(array $factories): array
+    private function processAttributes(array $factories): array
     {
         $result = [];
         foreach ($factories as $id => $factory) {
             $ref = new \ReflectionFunction($factory);
             $attributes = $ref->getAttributes();
-            $meta = new Meta();
-            $tags = [];
             foreach ($attributes as $attribute) {
-                $instance = $attribute->newInstance();
-                switch (true) {
-                    case $instance instanceof Tag:
-                        $tags[] = $instance->name;
-                        break;
-                    case $instance instanceof Description:
-                        $meta = $meta->withDescription($instance->text);
-                }
+                $result[$attribute->getName()][$id][] = $attribute->newInstance();
             }
-            $meta = $meta->withTags(...$tags);
-
-            $result[$id] = $meta;
         }
 
         return $result;
@@ -230,17 +215,39 @@ class Container implements TaggableContainer
      */
     public function getIdsWithTag(string $tag): array
     {
+        return $this->getIdsWithAttributes(Tag::class, fn(Tag $attr) => $attr->name === $tag);
+    }
+
+    /**
+     * @param string $attribute
+     * @param callable|null $matching
+     * @return string[]
+     */
+    public function getIdsWithAttributes(string $attribute, ?callable $matching = null): array
+    {
+        $matching = $matching ?? fn() => true;
         $result = [];
-        foreach ($this->meta as $id => $meta) {
-            if (!count($meta->tags())) {
+
+        if (!isset($this->attributeMap[Tag::class])) {
+            return [];
+        }
+        foreach ($this->attributeMap[$attribute] as $id => $attrInstances) {
+            if (!$this->matchesAny($matching, $attrInstances)) {
                 continue;
             }
-            if (array_search($tag, $meta->tags()) !== false) {
-                $result[] = $id;
+            $result[] = $id;
+        }
+        return $result;
+    }
+
+    private function matchesAny(callable $f, array $array): bool
+    {
+        foreach ($array as $x) {
+            if (call_user_func($f, $x) === true) {
+                return true;
             }
         }
-
-        return $result;
+        return false;
     }
 
     public function report(): array
@@ -263,4 +270,5 @@ class Container implements TaggableContainer
 
         return $table;
     }
+
 }
