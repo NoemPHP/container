@@ -270,5 +270,4 @@ class Container implements TaggableContainer
 
         return $table;
     }
-
 }

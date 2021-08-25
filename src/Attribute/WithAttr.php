@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-
 namespace Noem\Container\Attribute;
-
 
 use Attribute;
 
