@@ -14,17 +14,20 @@ use Invoker\ParameterResolver\NumericArrayResolver;
 use Invoker\ParameterResolver\ResolverChain;
 use Invoker\ParameterResolver\TypeHintResolver;
 use Invoker\Reflection\CallableReflection;
+use Noem\Container\Attribute\Alias;
 use Noem\Container\Attribute\Description;
 use Noem\Container\Attribute\Tag;
+use Noem\Container\Exception\ContainerBootstrapException;
 use Noem\Container\Exception\NotFoundException;
 use Noem\Container\Exception\ServiceInvokationException;
+use Noem\Container\ParameterResolver\AttributeResolver;
 use Noem\Container\ParameterResolver\IdAttributeResolver;
 use Noem\Container\ParameterResolver\NoDependantsResolver;
 use Noem\Container\ParameterResolver\TaggedAttributeResolver;
 use Psr\Container\ContainerInterface;
 use ReflectionParameter;
 
-class Container implements TaggableContainer
+class Container implements TaggableContainer, AttributeAwareContainer
 {
 
     private array $factories;
@@ -39,12 +42,16 @@ class Container implements TaggableContainer
 
     private ResolverChain $resolver;
 
+    /**
+     * @throws ContainerBootstrapException
+     */
     public function __construct(Provider ...$providers)
     {
         $this->resolver = new ResolverChain([
                                                 new NumericArrayResolver(),
                                                 new TypeHintResolver(),
                                                 new IdAttributeResolver($this),
+                                                new AttributeResolver($this),
                                                 new TaggedAttributeResolver($this),
                                                 new TypeHintContainerResolver($this),
                                                 new DefaultValueResolver(),
@@ -54,13 +61,14 @@ class Container implements TaggableContainer
 
         $factories = [
             ContainerInterface::class =>
-                #[Description('The Noem Application Container')]
-                fn() => $this,
-            self::class =>
+                #[Alias(AttributeAwareContainer::class)]
+                #[Alias(TaggableContainer::class)]
+                #[Alias(self::class)]
                 #[Description('The Noem Application Container')]
                 fn() => $this,
             InvokerInterface::class =>
-                #[Description('The Noem autowiring helper')]
+                #[Alias(Invoker::class)]
+                #[Description('The Noem auto-wiring helper')]
                 fn() => $this->invoker
         ];
         $extensions = [];
@@ -75,7 +83,12 @@ class Container implements TaggableContainer
 
         $this->factories = $factories;
         $this->extensions = $extensions;
-        $this->attributeMap = $this->processAttributes($factories);
+        try {
+            $this->attributeMap = $this->processAttributes($factories);
+            $this->appendAliases();
+        } catch (\Throwable $e) {
+            throw new ContainerBootstrapException('', 0, $e);
+        }
     }
 
     /**
@@ -113,6 +126,9 @@ class Container implements TaggableContainer
         return array_merge($defaults, $merged);
     }
 
+    /**
+     * @throws \ReflectionException
+     */
     private function processAttributes(array $factories): array
     {
         $result = [];
@@ -125,6 +141,33 @@ class Container implements TaggableContainer
         }
 
         return $result;
+    }
+
+    /**
+     * @throws \Exception
+     */
+    private function appendAliases()
+    {
+        if (!isset($this->attributeMap[Alias::class])) {
+            return;
+        }
+        foreach ($this->attributeMap[Alias::class] as $id => $aliases) {
+            foreach ($aliases as $alias) {
+                assert($alias instanceof Alias);
+                $alias = $alias->name;
+                if (isset($this->factories[$alias])) {
+                    throw new \Exception(
+                        sprintf(
+                            'Cannot create alias %s of service %s because a service of the same name is already defined',
+                            $alias,
+                            $id
+                        ),
+
+                    );
+                }
+                $this->factories[$alias] = &$this->factories[$id];
+            }
+        }
     }
 
     /**
@@ -170,8 +213,7 @@ class Container implements TaggableContainer
         return $this->invoker->call($this->extensions[$id], [$service]);
     }
 
-    /** @noinspection PhpMissingReturnTypeInspection */
-    public function has($id)
+    public function has($id): bool
     {
         return array_key_exists($id, $this->factories); //TODO Check if autowiring is possible?
     }
@@ -189,7 +231,7 @@ class Container implements TaggableContainer
             if (!(new \ReflectionClass($type))->getConstructor()) {
                 return new $type();
             }
-            $reflection = CallableReflection::create([$type, '__construct']);
+            $reflection = new \ReflectionMethod($type, '__construct');
         } catch (\ReflectionException $e) {
             throw new InvocationException("Service id '{$type}' could not be autowired");
         }
@@ -215,7 +257,7 @@ class Container implements TaggableContainer
      */
     public function getIdsWithTag(string $tag): array
     {
-        return $this->getIdsWithAttributes(Tag::class, fn(Tag $attr) => $attr->name === $tag);
+        return $this->getIdsWithAttribute(Tag::class, fn(Tag $attr) => $attr->name === $tag);
     }
 
     /**
@@ -223,12 +265,12 @@ class Container implements TaggableContainer
      * @param callable|null $matching
      * @return string[]
      */
-    public function getIdsWithAttributes(string $attribute, ?callable $matching = null): array
+    public function getIdsWithAttribute(string $attribute, ?callable $matching = null): array
     {
         $matching = $matching ?? fn() => true;
         $result = [];
 
-        if (!isset($this->attributeMap[Tag::class])) {
+        if (!isset($this->attributeMap[$attribute])) {
             return [];
         }
         foreach ($this->attributeMap[$attribute] as $id => $attrInstances) {
@@ -256,18 +298,67 @@ class Container implements TaggableContainer
             ['ID', 'returnType', 'tags', 'description'],
         ];
         foreach ($this->factories as $id => $factory) {
+            $tags = implode(
+                ' | ',
+                array_map(
+                    fn(Tag $t) => $t->name,
+                    $this->getAttributesOfId($id, Tag::class)
+                )
+            );
+            $table[] = [
+                $id,
+                $this->getReturnType($factory, $id),
+                $tags,
+                $this->getDescription($id)
+            ];
+        }
+
+        return $table;
+    }
+
+    private function getAttributesOfId(string $id, ?string $attributeFQCN = null): array
+    {
+        if (!isset($this->factories[$id])) {
+            return [];
+        }
+        $factory = $this->factories[$id];
+        try {
+            $ref = new \ReflectionFunction($factory);
+            return $ref->getAttributes($attributeFQCN);
+        } catch (\ReflectionException $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param callable $factory
+     * @param string $id In case the service ID is a FQCN, it can be used as a fallback
+     * @return string
+     */
+    private function getReturnType(callable $factory, $id = ''): string
+    {
+        try {
             $ref = new \ReflectionFunction($factory);
             $refReturnType = $ref->getReturnType();
-            $returnType = $refReturnType
+            return $refReturnType
                 ? $refReturnType->getName()
                 : (class_exists($id)
                     ? $id
                     : '');
-            $meta = $this->meta[$id];
-            $tags = implode(' | ', $meta->tags());
-            $table[] = [$id, $returnType, $tags, $meta->description()];
+        } catch (\ReflectionException $e) {
+            return '';
         }
+    }
 
-        return $table;
+    private function getDescription(string $id): string
+    {
+        /**
+         * @var $descriptionAttrs Description[]
+         */
+        $descriptionAttrs = $this->getAttributesOfId(Description::class);
+        if (empty($descriptionAttrs)) {
+            return '';
+        }
+        return $descriptionAttrs[0]->text;
     }
 }

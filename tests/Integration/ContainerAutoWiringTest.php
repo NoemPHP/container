@@ -13,6 +13,23 @@ use PHPUnit\Framework\TestCase;
 
 class ContainerAutoWiringTest extends TestCase
 {
+    public function testCanCreateUndefinedServiceWithoutConstructor()
+    {
+        $sut = new Container(
+            new ServiceProvider([])
+        );
+        $result = $sut->get(Bar::class);
+        $this->assertInstanceOf(Bar::class, $result);
+    }
+
+    public function testCanCreateUndefinedServiceWithConstructor()
+    {
+        $sut = new Container(
+            new ServiceProvider([])
+        );
+        $result = $sut->get(Foo::class);
+        $this->assertInstanceOf(Foo::class, $result);
+    }
 
     public function testCanAutowireMissingDefinitionWithoutParams()
     {
