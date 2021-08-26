@@ -158,7 +158,8 @@ class Container implements TaggableContainer, AttributeAwareContainer
                 if (isset($this->factories[$alias])) {
                     throw new \Exception(
                         sprintf(
-                            'Cannot create alias %s of service %s because a service of the same name is already defined',
+                            'Cannot create alias %s of service %s ' .
+                            'because a service of the same name is already defined',
                             $alias,
                             $id
                         ),
