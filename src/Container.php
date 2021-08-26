@@ -162,7 +162,6 @@ class Container implements TaggableContainer, AttributeAwareContainer
                             $alias,
                             $id
                         ),
-
                     );
                 }
                 $this->factories[$alias] = &$this->factories[$id];
