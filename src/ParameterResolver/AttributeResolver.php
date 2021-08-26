@@ -35,13 +35,25 @@ class AttributeResolver implements ParameterResolver
         }
         foreach ($parameters as $index => $parameter) {
             $attributes = $parameter->getAttributes(WithAttr::class);
-            $id = reset($attributes);
-            if (!$id) {
+            $withAttr = reset($attributes);
+            if (!$withAttr) {
                 continue;
             }
-            $id = $id->newInstance();
-            assert($id instanceof WithAttr);
-            $services = $this->container->getIdsWithAttribute($id->name);
+            $withAttr = $withAttr->newInstance();
+            assert($withAttr instanceof WithAttr);
+            $matchProps = $withAttr->matchProperties;
+            $match = empty($matchProps) ? null : function ($attribute) use ($matchProps) {
+                foreach ($matchProps as $prop => $value) {
+                    if (!property_exists($attribute, $prop)) {
+                        return false;
+                    }
+                    if ($attribute->$prop !== $value) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            $services = $this->container->getIdsWithAttribute($withAttr->name, $match);
             try {
                 $resolved = array_map(fn(string $s) => $this->container->get($s), $services);
                 for ($i = 0; $i < count($resolved); $i++) {

@@ -171,7 +171,11 @@ class Container implements TaggableContainer, AttributeAwareContainer
     }
 
     /**
+     * @template T
+     * @param class-string<T> $id
+     * @return mixed
      * @throws NotFoundException|ServiceInvokationException
+     * @noinspection PhpMissingReturnTypeInspection
      */
     public function get($id)
     {

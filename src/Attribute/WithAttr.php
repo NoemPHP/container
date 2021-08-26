@@ -10,7 +10,7 @@ use Attribute;
 class WithAttr
 {
 
-    public function __construct(public string $name)
+    public function __construct(public string $name, public array $matchProperties = [])
     {
     }
 }
