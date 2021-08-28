@@ -136,7 +136,10 @@ class Container implements TaggableContainer, AttributeAwareContainer
             $ref = new \ReflectionFunction($factory);
             $attributes = $ref->getAttributes();
             foreach ($attributes as $attribute) {
-                $result[$attribute->getName()][$id][] = $attribute->newInstance();
+                if (!isset($result[$attribute->getName()][$id])) {
+                    $result[$attribute->getName()][$id] = new AttributeProxyList();
+                }
+                $result[$attribute->getName()][$id][] = $attribute;
             }
         }
 
@@ -254,6 +257,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
         return new $type(...$args);
     }
 
+
     /**
      * @param string $tag
      *
@@ -286,7 +290,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
         return $result;
     }
 
-    private function matchesAny(callable $f, array $array): bool
+    private function matchesAny(callable $f, iterable $array): bool
     {
         foreach ($array as $x) {
             if (call_user_func($f, $x) === true) {
@@ -320,18 +324,21 @@ class Container implements TaggableContainer, AttributeAwareContainer
         return $table;
     }
 
-    private function getAttributesOfId(string $id, ?string $attributeFQCN = null): array
+    public function getAttributesOfId(string $id, ?string $attributeFQCN = null): array
     {
-        if (!isset($this->factories[$id])) {
-            return [];
+        $result = [];
+
+        if ($attributeFQCN && !isset($this->attributeMap[$attributeFQCN])) {
+            return $result;
         }
-        $factory = $this->factories[$id];
-        try {
-            $ref = new \ReflectionFunction($factory);
-            return $ref->getAttributes($attributeFQCN);
-        } catch (\ReflectionException $e) {
-            return [];
+        $search = $attributeFQCN ? [$attributeFQCN => &$this->attributeMap[$attributeFQCN]] : $this->attributeMap;
+        foreach ($search as $attr => $idAttrs) {
+            if (!isset($idAttrs[$id])) {
+                continue;
+            }
+            $result = [...$result, ...$idAttrs[$id]];
         }
+        return $result;
     }
 
     /**
