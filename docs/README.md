@@ -15,6 +15,7 @@ The container works by assimilating service factory functions from one or more S
 like this:
 
 [embed]:# "path: ../src/Provider.php, match: 'interface.*?}'"
+
 ```php
 interface Provider
 {
@@ -62,6 +63,7 @@ During service compilation, the container will parse all function attributes and
 automatic resolving of dependencies by implementing `AttributeAwareContainer`:
 
 [embed]:# "path: ../src/AttributeAwareContainer.php, match: 'interface.*?}'"
+
 ```php
 interface AttributeAwareContainer extends ContainerInterface
 {
@@ -69,7 +71,9 @@ interface AttributeAwareContainer extends ContainerInterface
 
     public function getAttributesOfId(string $id, ?string $attributeFQCN = null): array;
 }
-```### Service-level Attributes
+```
+
+### Service-level Attributes
 
 #### Alias
 
@@ -115,6 +119,7 @@ Can be used on parameters of factories/extension functions. It instructs the Con
 fetching the specified entry. Takes precedence over other means of parameter resolution
 
 [embed]:# "path: ../tests/Integration/ContainerAutoWiringTest.php, match: 'public function testCanProcessIdAttribute.*?}'"
+
 ```php
 public function testCanProcessIdAttribute()
     {
