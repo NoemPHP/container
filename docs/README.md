@@ -13,7 +13,9 @@ Install this package via composer:
 
 The container works by assimilating service factory functions from one or more Service Providers. A `Provider` looks
 like this:
+
 [embed]:# "path: ../src/Provider.php, match: 'interface.*?}'"
+
 ```php
 interface Provider
 {
@@ -53,11 +55,15 @@ interface Provider
      */
     public function getExtensions(): array;
 }
-```## Attributes
+```
+
+## Attributes
 
 During service compilation, the container will parse all function attributes and make them available for manual and
 automatic resolving of dependencies by implementing `AttributeAwareContainer`:
+
 [embed]:# "path: ../src/AttributeAwareContainer.php, match: 'interface.*?}'"
+
 ```php
 interface AttributeAwareContainer extends ContainerInterface
 {
@@ -111,6 +117,7 @@ Can be used on parameters of factories/extension functions. It instructs the Con
 fetching the specified entry. Takes precedence over other means of parameter resolution
 
 [embed]:# "path: ../tests/Integration/ContainerAutoWiringTest.php, match: 'public function testCanProcessIdAttribute.*?}'"
+
 ```php
 public function testCanProcessIdAttribute()
     {
