@@ -6,6 +6,7 @@ namespace Noem\Container;
 
 use Invoker\Exception\InvocationException;
 use Invoker\Exception\NotCallableException;
+use Invoker\Exception\NotEnoughParametersException;
 use Invoker\Invoker;
 use Invoker\InvokerInterface;
 use Invoker\ParameterResolver\Container\TypeHintContainerResolver;
@@ -36,6 +37,9 @@ class Container implements TaggableContainer, AttributeAwareContainer
 
     private array $attributeMap;
 
+    private array $aliases;
+    private array $moduleMap;
+
     private array $cache = [];
 
     private Invoker $invoker;
@@ -58,7 +62,30 @@ class Container implements TaggableContainer, AttributeAwareContainer
                                                 new NoDependantsResolver(),
                                             ]);
         $this->invoker = new Invoker($this->resolver, $this);
+        $providers = ['_internal' => $this->createInternalProvider()] + $providers;
+        $factories = [];
+        $extensions = [];
+        $moduleIdMap = [];
+        foreach ($providers as $moduleKey => $provider) {
+            $moduleFactories = $provider->getFactories();
+            $moduleIdMap = array_merge($moduleIdMap, array_fill_keys(array_keys($moduleFactories), $moduleKey));
+            $factories = array_merge($factories, $moduleFactories);
+            $extensions = $this->mergeExtensions($extensions, $provider->getExtensions());
+        }
 
+        $this->factories = $factories;
+        $this->extensions = $extensions;
+        $this->moduleMap = $moduleIdMap;
+        try {
+            $this->attributeMap = $this->processAttributes($factories);
+            $this->aliases = $this->processAliases();
+        } catch (\Throwable $e) {
+            throw new ContainerBootstrapException('', 0, $e);
+        }
+    }
+
+    private function createInternalProvider(): Provider
+    {
         $factories = [
             ContainerInterface::class =>
                 #[Alias(AttributeAwareContainer::class)]
@@ -71,24 +98,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
                 #[Description('The Noem auto-wiring helper')]
                 fn() => $this->invoker
         ];
-        $extensions = [];
-
-        foreach ($providers as $provider) {
-            $factories = array_merge(
-                $factories,
-                $provider->getFactories(),
-            );
-            $extensions = $this->mergeExtensions($extensions, $provider->getExtensions());
-        }
-
-        $this->factories = $factories;
-        $this->extensions = $extensions;
-        try {
-            $this->attributeMap = $this->processAttributes($factories);
-            $this->appendAliases();
-        } catch (\Throwable $e) {
-            throw new ContainerBootstrapException('', 0, $e);
-        }
+        return new ServiceProvider($factories);
     }
 
     /**
@@ -149,10 +159,11 @@ class Container implements TaggableContainer, AttributeAwareContainer
     /**
      * @throws \Exception
      */
-    private function appendAliases()
+    private function processAliases(): array
     {
+        $result = [];
         if (!isset($this->attributeMap[Alias::class])) {
-            return;
+            return [];
         }
         foreach ($this->attributeMap[Alias::class] as $id => $aliases) {
             foreach ($aliases as $alias) {
@@ -168,9 +179,10 @@ class Container implements TaggableContainer, AttributeAwareContainer
                         ),
                     );
                 }
-                $this->factories[$alias] = &$this->factories[$id];
+                $result[$alias] = $id;
             }
         }
+        return $result;
     }
 
     /**
@@ -182,6 +194,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
      */
     public function get($id)
     {
+        $id = $this->resolveIdAlias($id);
         if (array_key_exists($id, $this->cache)) {
             return $this->cache[$id];
         }
@@ -189,8 +202,23 @@ class Container implements TaggableContainer, AttributeAwareContainer
         try {
             return $this->cache[$id] = $this->createService($id);
         } catch (InvocationException $e) {
-            throw new ServiceInvokationException("Service id '{$id}' not found in container", 0, $e);
+            throw new ServiceInvokationException(
+                sprintf(
+                    "Service '%s' could not be auto-wired",
+                    $id
+                ),
+                0,
+                $e
+            );
         }
+    }
+
+    private function resolveIdAlias(string $maybeAliased): string
+    {
+        if (!isset($this->aliases[$maybeAliased])) {
+            return $maybeAliased;
+        }
+        return $this->aliases[$maybeAliased];
     }
 
     /**
@@ -200,7 +228,6 @@ class Container implements TaggableContainer, AttributeAwareContainer
      *
      * @return mixed
      * @throws NotFoundException
-     * @throws InvocationException
      */
     private function createService(string $id): mixed
     {
@@ -222,7 +249,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
 
     public function has($id): bool
     {
-        return array_key_exists($id, $this->factories); //TODO Check if autowiring is possible?
+        return array_key_exists($this->resolveIdAlias($id), $this->factories); //TODO Check if autowiring is possible?
     }
 
     /**
@@ -303,7 +330,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
     public function report(): array
     {
         $table = [
-            ['ID', 'returnType', 'tags', 'description'],
+            ['ID', 'Module', 'returnType', 'Tags', 'Description', 'Attributes'],
         ];
         foreach ($this->factories as $id => $factory) {
             $tags = implode(
@@ -315,9 +342,11 @@ class Container implements TaggableContainer, AttributeAwareContainer
             );
             $table[] = [
                 $id,
+                $this->moduleMap[$id],
                 $this->getReturnType($factory, $id),
                 $tags,
-                $this->getDescription($id)
+                $this->getDescription($id),
+                array_map(fn($a) => get_class($a), $this->getAttributesOfId($id))
             ];
         }
 
@@ -366,7 +395,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
         /**
          * @var $descriptionAttrs Description[]
          */
-        $descriptionAttrs = $this->getAttributesOfId(Description::class);
+        $descriptionAttrs = $this->getAttributesOfId($id, Description::class);
         if (empty($descriptionAttrs)) {
             return '';
         }
