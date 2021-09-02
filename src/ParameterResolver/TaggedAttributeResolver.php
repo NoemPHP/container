@@ -6,6 +6,7 @@ namespace Noem\Container\ParameterResolver;
 
 use Invoker\ParameterResolver\ParameterResolver;
 use Noem\Container\Attribute\Id;
+use Noem\Container\Attribute\Tag;
 use Noem\Container\Attribute\Tagged;
 use Noem\Container\Container;
 use Noem\Container\TaggableContainer;
@@ -31,19 +32,47 @@ class TaggedAttributeResolver implements ParameterResolver
         }
         foreach ($parameters as $index => $parameter) {
             $attributes = $parameter->getAttributes(Tagged::class);
-            $id = reset($attributes);
-            if (!$id) {
+            $attribute = reset($attributes);
+            if (!$attribute) {
                 continue;
             }
-            $id = $id->newInstance();
-            assert($id instanceof Tagged);
-            $services = $this->container->getIdsWithTag($id->name);
-            $resolved = array_map(fn(string $s) => $this->container->get($s), $services);
+            $attribute = $attribute->newInstance();
+            assert($attribute instanceof Tagged);
+            $services = $this->container->getIdsWithTag($attribute->name);
+
+            $prioritized = [];
+            foreach ($services as $serviceId) {
+                $tag = $this->findMatchingTag($serviceId, $attribute->name);
+                if (!$tag) {
+                    continue;
+                }
+                $prioritized[$serviceId] = $tag->priority;
+            }
+            asort($prioritized, SORT_NUMERIC);
+
+            $resolved = array_map(
+                fn(string $s) => $this->container->get($s),
+                array_keys($prioritized)
+            );
+
             for ($i = 0; $i < count($resolved); $i++) {
                 $resolvedParameters[$index + $i] = $resolved[$i];
             }
         }
 
         return $resolvedParameters;
+    }
+
+    private function findMatchingTag(string $serviceId, string $tagName): ?Tag
+    {
+        $attributes = $this->container->getAttributesOfId($serviceId, Tag::class);
+        foreach ($attributes as $attribute) {
+            assert($attribute instanceof Tag);
+            if ($attribute->name === $tagName) {
+                return $attribute;
+            }
+        }
+
+        return null;
     }
 }
