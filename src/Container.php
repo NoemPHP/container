@@ -22,29 +22,25 @@ use Noem\Container\Exception\ContainerBootstrapException;
 use Noem\Container\Exception\NotFoundException;
 use Noem\Container\Exception\ServiceInvokationException;
 use Noem\Container\ParameterResolver\AttributeResolver;
+use Noem\Container\ParameterResolver\CircularDependencyResolver;
 use Noem\Container\ParameterResolver\IdAttributeResolver;
 use Noem\Container\ParameterResolver\NoDependantsResolver;
 use Noem\Container\ParameterResolver\TaggedAttributeResolver;
+use Noem\TinyProxy\TinyProxy;
 use Psr\Container\ContainerInterface;
 use ReflectionParameter;
 
 class Container implements TaggableContainer, AttributeAwareContainer
 {
 
-    private array $factories;
-
-    private array $extensions;
 
     private array $attributeMap;
-
-    private array $aliases;
-    private array $moduleMap;
-
-    private array $cache = [];
 
     private Invoker $invoker;
 
     private ResolverChain $resolver;
+    private AggregateProvider $aggregateProvider;
+    private ContainerInterface $baseContainer;
 
     /**
      * @throws ContainerBootstrapException
@@ -52,36 +48,33 @@ class Container implements TaggableContainer, AttributeAwareContainer
     public function __construct(Provider ...$providers)
     {
         $this->resolver = new ResolverChain([
-                                                new NumericArrayResolver(),
-                                                new TypeHintResolver(),
-                                                new IdAttributeResolver($this),
-                                                new AttributeResolver($this),
-                                                new TaggedAttributeResolver($this),
-                                                new TypeHintContainerResolver($this),
-                                                new DefaultValueResolver(),
-                                                new NoDependantsResolver(),
-                                            ]);
+            new NumericArrayResolver(),
+            new TypeHintResolver(),
+            new IdAttributeResolver($this),
+            new AttributeResolver($this),
+            new TaggedAttributeResolver($this),
+            new TypeHintContainerResolver($this),
+            new DefaultValueResolver(),
+            new NoDependantsResolver(),
+        ]);
         $this->invoker = new Invoker($this->resolver, $this);
-        $providers = ['_internal' => $this->createInternalProvider()] + $providers;
-        $factories = [];
-        $extensions = [];
-        $moduleIdMap = [];
-        foreach ($providers as $moduleKey => $provider) {
-            $moduleFactories = $provider->getFactories();
-            $moduleIdMap = array_merge($moduleIdMap, array_fill_keys(array_keys($moduleFactories), $moduleKey));
-            $factories = array_merge($factories, $moduleFactories);
-            $extensions = $this->mergeExtensions($extensions, $provider->getExtensions());
-        }
+        $providers['_internal'] = $this->createInternalProvider();
 
-        $this->factories = $factories;
-        $this->extensions = $extensions;
-        $this->moduleMap = $moduleIdMap;
+        $this->aggregateProvider = new AggregateProvider(...$providers);
         try {
-            $this->attributeMap = $this->processAttributes($factories);
-            $this->aliases = $this->processAliases();
+            $this->attributeMap = $this->processAttributes($this->aggregateProvider->getFactories());
         } catch (\Throwable $e) {
             throw new ContainerBootstrapException('', 0, $e);
         }
+        $autowiringContainer = new AutowiringContainer($this->invoker, $this->aggregateProvider);
+        $resolvingContainer = new CircularDependencyResolvingContainer($autowiringContainer);
+        $resolvingContainer->setContainer($this);
+        $autowiringContainer->setContainer($this);
+
+        $this->baseContainer = new AliasingContainer(
+            $this->processAliases(),
+            new CachingContainer($resolvingContainer, fn($id)=>$resolvingContainer->createProxy($id))
+        );
     }
 
     private function createInternalProvider(): Provider
@@ -99,41 +92,6 @@ class Container implements TaggableContainer, AttributeAwareContainer
                 fn() => $this->invoker
         ];
         return new ServiceProvider($factories);
-    }
-
-    /**
-     * Merged service extensions.
-     *
-     * @param callable[] $defaults
-     * @param callable[] $extensions
-     *
-     * @return callable[] The merged extensions.
-     */
-    private function mergeExtensions(array $defaults, array $extensions): array
-    {
-        $merged = [];
-
-        foreach ($extensions as $key => $extension) {
-            assert(is_callable($extension));
-
-            if (!isset($defaults[$key])) {
-                $merged[$key] = $extension;
-
-                continue;
-            }
-            $default = $defaults[$key];
-            $merged[$key] = function ($previous) use ($default, $extension) {
-                assert(is_callable($default));
-
-                $result = $this->invoker->call($default, [$previous]);
-
-                return $this->invoker->call($extension, [$result]);
-            };
-
-            unset($defaults[$key]);
-        }
-
-        return array_merge($defaults, $merged);
     }
 
     /**
@@ -170,7 +128,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
                 assert($alias instanceof Alias);
                 $alias = $alias->name;
                 if (isset($this->factories[$alias])) {
-                    throw new \Exception(
+                    throw new ContainerBootstrapException(
                         sprintf(
                             'Cannot create alias %s of service %s ' .
                             'because a service of the same name is already defined',
@@ -194,94 +152,12 @@ class Container implements TaggableContainer, AttributeAwareContainer
      */
     public function get($id)
     {
-        $id = $this->resolveIdAlias($id);
-        if (array_key_exists($id, $this->cache)) {
-            return $this->cache[$id];
-        }
-
-        try {
-            return $this->cache[$id] = $this->createService($id);
-        } catch (InvocationException $e) {
-            throw new ServiceInvokationException(
-                sprintf(
-                    "Service '%s' could not be auto-wired",
-                    $id
-                ),
-                0,
-                $e
-            );
-        }
-    }
-
-    private function resolveIdAlias(string $maybeAliased): string
-    {
-        if (!isset($this->aliases[$maybeAliased])) {
-            return $maybeAliased;
-        }
-        return $this->aliases[$maybeAliased];
-    }
-
-    /**
-     * Creates a service by invoking its factory as well as its extensions
-     *
-     * @param string $id
-     *
-     * @return mixed
-     * @throws NotFoundException
-     */
-    private function createService(string $id): mixed
-    {
-        if (!$this->has($id)) {
-            if (class_exists($id)) {
-                return $this->resolveInstance($id);
-            }
-            throw new NotFoundException("Service id '{$id}' not found in container");
-        }
-
-        $service = $this->invoker->call($this->factories[$id]);
-
-        if (!array_key_exists($id, $this->extensions)) {
-            return $service;
-        }
-
-        return $this->invoker->call($this->extensions[$id], [$service]);
+        return $this->baseContainer->get($id);
     }
 
     public function has($id): bool
     {
-        return array_key_exists($this->resolveIdAlias($id), $this->factories); //TODO Check if autowiring is possible?
-    }
-
-    /**
-     * @param string $type
-     *
-     * @return mixed|void
-     * @throws InvocationException
-     * @throws NotCallableException
-     */
-    private function resolveInstance(string $type)
-    {
-        try {
-            if (!(new \ReflectionClass($type))->getConstructor()) {
-                return new $type();
-            }
-            $reflection = new \ReflectionMethod($type, '__construct');
-        } catch (\ReflectionException $e) {
-            throw new InvocationException("Service id '{$type}' could not be autowired");
-        }
-        $args = $this->resolver->getParameters($reflection, [], []);
-
-        // Sort by array key because call_user_func_array ignores numeric keys
-        ksort($args);
-
-        // Check all parameters are resolved
-        $diff = array_diff_key($reflection->getParameters(), $args);
-        $parameter = reset($diff);
-        if ($parameter && \assert($parameter instanceof ReflectionParameter) && !$parameter->isVariadic()) {
-            throw new InvocationException("Service id '{$type}' could not be autowired");
-        }
-
-        return new $type(...$args);
+        return $this->baseContainer->has($id);
     }
 
 

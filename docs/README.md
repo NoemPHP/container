@@ -1,7 +1,13 @@
 # Noem Container
 
 A modern auto-wiring service container that leverages PHP8 Attributes to tag and interlink services with their
-dependencies
+dependencies.
+
+It features:
+
+* Aggregating services from multiple modules using a service provider pattern
+* Comprehensive support for auto-wiring strategies
+* Resolution of circular dependencies by automatically injecting lightweight proxy objects
 
 ## Installation
 
@@ -15,6 +21,7 @@ The container works by assimilating service factory functions from one or more S
 like this:
 
 [embed]:# "path: ../src/Provider.php, match: 'interface.*?}'"
+
 ```php
 interface Provider
 {
@@ -62,6 +69,7 @@ During service compilation, the container will parse all function attributes and
 automatic resolving of dependencies by implementing `AttributeAwareContainer`:
 
 [embed]:# "path: ../src/AttributeAwareContainer.php, match: 'interface.*?}'"
+
 ```php
 interface AttributeAwareContainer extends ContainerInterface
 {
@@ -75,7 +83,7 @@ interface AttributeAwareContainer extends ContainerInterface
 
 #### Alias
 
-Example: `#[Alias( 'my-other-service-id' )]`
+> Example: `#[Alias( 'my-other-service-id' )]`
 
 Use this to advertise your service under a number of IDs without repeating the definition. One use-case is to enforce
 interface segregation in consumers while supplying them with a class that implements multiple interfaces:
@@ -107,43 +115,67 @@ $container->get(WritableContainerInterface::class);
 $container->get(FlushableContainerinterface::class);
 ```
 
+#### Tag
+
+> Example: `Tag( 'event-listener' )`
+
+You can use this attribute as a low-coupling way to implement extensible "lists of things". A natural application for
+this would be to wire up event subscribers to a PSR-14 ListenerProvider
+
+```php
+$services = [
+    'listener.all' =>
+        #[Tag('event-listener')]
+        fn( LoggerInterface $logger ) => function( object $event ) use ($logger){
+            $logger->info( 'Event triggered: ' . print_r( $event, true ) );
+        },
+];
+```
+
+The Tag attribute also supports specifying a priority which is used to sort services before they are passed to
+consumers. The default priority is `50`
+
+> Example: `Tag( 'event-listener', 10 )`
+
 ### Parameter-level Attributes
 
 #### Id
 
-Example: `#[Id( 'service-id' )]`
+> Example: `#[Id( 'service-id' )]`
 
 Can be used on parameters of factories/extension functions. It instructs the Container to resolve the parameter by
 fetching the specified entry. Takes precedence over other means of parameter resolution
 
-[embed]:# "path: ../tests/Integration/ContainerAutoWiringTest.php, match: 'public function testCanProcessIdAttribute.*?}'"
 ```php
-public function testCanProcessIdAttribute()
-    {
-        $services = [
-            'my-string' => fn() => 'hello-world',
-            NeedsString::class =>
-                fn(#[Id('my-string')] string $string) => new NeedsString($string),
-        ];
+$services = [
+    'my-string' => fn() => 'hello',
+    'greeting' =>
+        fn(#[Id('my-string')] string $string) => "{$string} world",
+];
 
-        $sut = new Container(new ServiceProvider($services));
-        $result = $sut->get(NeedsString::class);
-
-        $this->assertInstanceOf(NeedsString::class, $result);
-        $this->assertSame('hello-world', $result->value);
-    }
+$container = new Container(new ServiceProvider($services));
+$greeting = $container->get('greeting'); // 'hello world'
 ```
 
 #### WithAttr
 
-Example: `#[WithAttr( MyCustomAttr::class )]`
+> Example: `#[WithAttr( MyCustomAttr::class )]`
 
 Resolves to all services that have been annotated with the specified Attribute.
 
-Example: `#[WithAttr( MyCustomAttr::class, [ 'name' => 'foo' ] )]`
+> Example: `#[WithAttr( MyCustomAttr::class, [ 'name' => 'foo' ] )]`
 
 #### TaggedWith
 
-Example: `#[TaggedWith( 'foo' )]`
+> Example: `#[TaggedWith( 'foo' )]`
 
 This is is a shorthand for `WithAttr( Tag::class, [ 'name' => $MY_TAG ] )` to fetch all services with the specified tag.
+
+```php
+$services = [
+    ListenerProviderInterface:: =>
+        fn(#[TaggedWith('event-listener')] callable ...$listeners) => new ListenerProvider(...$listeners),
+];
+
+```
+
