@@ -21,7 +21,6 @@ The container works by assimilating service factory functions from one or more S
 like this:
 
 [embed]:# "path: ../src/Provider.php, match: 'interface.*?}'"
-
 ```php
 interface Provider
 {
@@ -69,7 +68,6 @@ During service compilation, the container will parse all function attributes and
 automatic resolving of dependencies by implementing `AttributeAwareContainer`:
 
 [embed]:# "path: ../src/AttributeAwareContainer.php, match: 'interface.*?}'"
-
 ```php
 interface AttributeAwareContainer extends ContainerInterface
 {

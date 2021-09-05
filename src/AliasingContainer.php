@@ -10,7 +10,6 @@ class AliasingContainer implements ContainerInterface
 {
     public function __construct(private array $aliases, private ContainerInterface $inner)
     {
-
     }
 
     public function get(string $id)

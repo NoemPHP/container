@@ -72,7 +72,6 @@ class AggregateProvider implements Provider
 
     public function getProviderKey(string $id): string
     {
-
     }
 
     public function getFactories(): array
@@ -82,6 +81,6 @@ class AggregateProvider implements Provider
 
     public function getExtensions(): array
     {
-     return $this->extensions;
+        return $this->extensions;
     }
 }

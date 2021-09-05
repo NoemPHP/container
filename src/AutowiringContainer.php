@@ -18,11 +18,10 @@ class AutowiringContainer implements FactoryProvidingContainer
     private $extensions;
 
     public function __construct(
-        private Invoker     $invoker,
-        private Provider    $provider,
+        private Invoker $invoker,
+        private Provider $provider,
         ?ContainerInterface $baseContainer = null
-    )
-    {
+    ) {
         $this->extensions = $this->provider->getExtensions();
         $this->baseContainer = $baseContainer ?? $this;
     }
