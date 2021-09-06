@@ -20,7 +20,7 @@ class CircularDependencyResolvingContainer implements ContainerInterface
         $this->outerContainer = $container;
     }
 
-    public function get(string $id)
+    public function get($id)
     {
         if ($this->isCircularDependency($id)) {
             return $this->createProxy($id);
@@ -31,7 +31,7 @@ class CircularDependencyResolvingContainer implements ContainerInterface
         return $result;
     }
 
-    public function has(string $id): bool
+    public function has($id): bool
     {
         return $this->inner->has($id);
     }

@@ -25,7 +25,7 @@ WHOOPS,
         };
     }
 
-    public function get(string $id)
+    public function get($id)
     {
         if (!array_key_exists($id, $this->cache)) {
             $this->cache[$id] = function () use ($id) {

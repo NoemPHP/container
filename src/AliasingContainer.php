@@ -12,7 +12,7 @@ class AliasingContainer implements ContainerInterface
     {
     }
 
-    public function get(string $id)
+    public function get($id)
     {
         return $this->inner->get($this->resolveIdAlias($id));
     }
@@ -25,7 +25,7 @@ class AliasingContainer implements ContainerInterface
         return $this->aliases[$maybeAliased];
     }
 
-    public function has(string $id): bool
+    public function has($id): bool
     {
         return $this->inner->has($this->resolveIdAlias($id));
     }
