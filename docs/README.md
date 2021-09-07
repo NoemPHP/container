@@ -158,7 +158,7 @@ $greeting = $container->get('greeting'); // 'hello world'
 
 > Example: `#[WithAttr( MyCustomAttr::class )]`
 
-Resolves to all services that have been annotated with the specified Attribute. You can optionally pass a map of key|value pairs that will be used for filtering results.
+Resolves to all services that have been annotated with the specified Attribute. You can optionally pass a map of key/value pairs that will be used for filtering results.
 
 > Example: `#[WithAttr( MyCustomAttr::class, [ 'name' => 'foo' ] )]`
 
