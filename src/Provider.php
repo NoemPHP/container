@@ -29,7 +29,7 @@ interface Provider
      * Callables have the following signature:
      *        function( mixed $previous, mixed ...$params )
      * The $previous parameter MUST be the first one. Additional parameters will be resolved by the Container.
-     
+
      * @psalm-return array<string,callable(mixed, mixed...):mixed>
      * @return callable[]
      */
