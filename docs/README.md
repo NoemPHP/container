@@ -6,7 +6,7 @@ dependencies.
 It features:
 
 * Aggregating services from multiple modules using a service provider pattern
-* Comprehensive support for auto-wiring strategies
+* Comprehensive support for auto-wiring strategies leveraging [php-di/invoker](https://github.com/PHP-DI/Invoker)
 * Resolution of circular dependencies by automatically injecting lightweight proxy objects
 
 ## Installation
@@ -64,6 +64,8 @@ interface Provider
 
 ## Attributes
 
+PHP 8 introduced [a new feature called Attributes](https://stitcher.io/blog/attributes-in-php-8) that allows adding arbitrary metadata to classes, functions, methods and parameters. This provides us with a lot of flexibility when writing service definitions.
+
 During service compilation, the container will parse all function attributes and make them available for manual and
 automatic resolving of dependencies by implementing `AttributeAwareContainer`:
 
@@ -83,7 +85,7 @@ interface AttributeAwareContainer extends ContainerInterface
 
 > Example: `#[Alias( 'my-other-service-id' )]`
 
-Use this to advertise your service under a number of IDs without repeating the definition. One use-case is to enforce
+Use this to advertise your service under a number of IDs without repeating the definition. One use-case is to encourage
 interface segregation in consumers while supplying them with a class that implements multiple interfaces:
 
 ```php
@@ -97,10 +99,12 @@ class MyContainer implements ContainerInterface, WritableContainerInterface, Flu
 The service can be defined as follows:
 
 ```php
-#[Alias(ContainerInterface::class)]
-#[Alias(WritableContainerInterface::class)]
-#[Alias(FlushableContainerinterface::class)]
-MyContainer::class => fn() => new MyContainer()
+
+MyContainer::class => 
+    #[Alias(ContainerInterface::class)]
+    #[Alias(WritableContainerInterface::class)]
+    #[Alias(FlushableContainerinterface::class)]
+    fn() => new MyContainer()
 ```
 
 The container is now able to resolve any of the interface FQCNs to the instance of `MyContainer`:
