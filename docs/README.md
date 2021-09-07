@@ -129,7 +129,7 @@ $services = [
 ];
 ```
 
-The Tag attribute also supports specifying a priority which is used to sort services before they are passed to
+The Tag attribute also supports specifying an optional `priority` which is used to sort services before they are passed to
 consumers. The default priority is `50`
 
 > Example: `Tag( 'event-listener', 10 )`
@@ -158,9 +158,11 @@ $greeting = $container->get('greeting'); // 'hello world'
 
 > Example: `#[WithAttr( MyCustomAttr::class )]`
 
-Resolves to all services that have been annotated with the specified Attribute.
+Resolves to all services that have been annotated with the specified Attribute. You can optionally pass a map of key|value pairs that will be used for filtering results.
 
 > Example: `#[WithAttr( MyCustomAttr::class, [ 'name' => 'foo' ] )]`
+
+This will return only those services that are annotated with `#[MyCustomAttr('foo')]` (provided that `foo` maps to the attribute's `name` property of course)
 
 #### TaggedWith
 
