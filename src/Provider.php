@@ -28,13 +28,8 @@ interface Provider
      *
      * Callables have the following signature:
      *        function( mixed $previous, mixed ...$params )
-     *
-     * About factories parameters:
-     *
-     * - the container (instance of `Psr\Container\ContainerInterface`)
-     * - the entry to be extended. If the entry to be extended does not exist and the parameter is nullable, `null`
-     * will be passed.
-     *
+     * The $previous parameter MUST be the first one. Additional parameters will be resolved by the Container.
+     
      * @psalm-return array<string,callable(mixed, mixed...):mixed>
      * @return callable[]
      */
