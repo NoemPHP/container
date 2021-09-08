@@ -208,7 +208,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
         $table = [
             ['ID', 'Module', 'returnType', 'Tags', 'Description', 'Attributes'],
         ];
-        foreach ($this->factories as $id => $factory) {
+        foreach ($this->aggregateProvider->getFactories() as $id => $factory) {
             $tags = implode(
                 ' | ',
                 array_map(
@@ -218,7 +218,7 @@ class Container implements TaggableContainer, AttributeAwareContainer
             );
             $table[] = [
                 $id,
-                $this->moduleMap[$id],
+                $this->aggregateProvider->getProviderKey($id),
                 $this->getReturnType($factory, $id),
                 $tags,
                 $this->getDescription($id),

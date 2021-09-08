@@ -72,6 +72,7 @@ class AggregateProvider implements Provider
 
     public function getProviderKey(string $id): string
     {
+        return $this->moduleMap[$id];
     }
 
     public function getFactories(): array
