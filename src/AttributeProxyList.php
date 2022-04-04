@@ -18,7 +18,7 @@ class AttributeProxyList implements \ArrayAccess, \Iterator
         return isset($this->reflectionAttributes[$offset]);
     }
 
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
         if ($offset === null) {
             $this->reflectionAttributes[] = $value;
@@ -28,18 +28,18 @@ class AttributeProxyList implements \ArrayAccess, \Iterator
         $this->reflectionAttributes[$offset] = $value;
     }
 
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
         unset($this->instances[$offset]);
         unset($this->reflectionAttributes[$offset]);
     }
 
-    public function current()
+    public function current(): mixed
     {
         return $this->offsetGet($this->key());
     }
 
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
         if (!isset($this->instances[$offset])) {
             $this->instances[$offset] = $this->reflectionAttributes[$offset]->newInstance();
@@ -52,7 +52,7 @@ class AttributeProxyList implements \ArrayAccess, \Iterator
         return key($this->reflectionAttributes);
     }
 
-    public function next()
+    public function next(): void
     {
         next($this->reflectionAttributes);
     }
@@ -62,7 +62,7 @@ class AttributeProxyList implements \ArrayAccess, \Iterator
         return current($this->reflectionAttributes) !== false;
     }
 
-    public function rewind()
+    public function rewind(): void
     {
         reset($this->reflectionAttributes);
     }
