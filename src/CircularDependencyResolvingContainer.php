@@ -74,7 +74,7 @@ Recursive dependency chain detected at service "%s". Breaking the chain with a p
 To solve this Problem, please either
 
 1. Refactor your service configuration to get rid of the recursion
-2. Declare a concrete concrete return type one of the factory signatures
+2. Declare a concrete return type one of the factory signatures
 3. Use a concrete FQCN as the service ID
 OH_NO,
                     $id
